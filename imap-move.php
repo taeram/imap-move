@@ -81,7 +81,7 @@ foreach ($src_path_list as $path) {
         $tgt_mail_list[ $mail['message_id'] ] = !empty($mail['subject']) ? $mail['subject'] : "[ No Subject ] Message $i";
     }
 
-    for ($src_idx=$src_path_stat['mail_count'];$src_idx>=1;$src_idx--) {
+    for ($src_idx = $src_path_stat['mail_count']; $src_idx >= 1; $src_idx--) {
 
         $stat = $S->mailStat($src_idx);
         $stat['answered'] = trim($stat['Answered']);
@@ -121,31 +121,50 @@ foreach ($src_path_list as $path) {
     }
 }
 
-class IMAP
-{
-    private $_c; // Connection Handle
-    private $_c_host; // Server Part {}
-    private $_c_base; // Base Path Requested
+class IMAP {
+    /**
+     * Connection Handle
+     *
+     * @var resource
+     */
+    private $_c;
+
+    /**
+     * Server Part {}
+     *
+     * @var string
+     */
+    private $_c_host;
+
+    /**
+     * Base Path Requested
+     *
+     * @var string
+     */
+    private $_c_base;
 
     /**
      * Connect to an IMAP
+     *
+     * @param string $uri The IMAP server URI
      */
-    function __construct($uri)
-    {
+    function __construct($uri) {
         $this->_c = null;
         $this->_c_host = sprintf('{%s',$uri['host']);
         if (!empty($uri['port'])) {
             $this->_c_host.= sprintf(':%d',$uri['port']);
         }
+
         switch (strtolower(@$uri['scheme'])) {
-        case 'imap-ssl':
-            $this->_c_host.= '/ssl';
-            break;
-        case 'imap-tls':
-            $this->_c_host.= '/tls';
-            break;
-        default:
+            case 'imap-ssl':
+                $this->_c_host.= '/ssl';
+                break;
+            case 'imap-tls':
+                $this->_c_host.= '/tls';
+                break;
+            default:
         }
+
         $this->_c_host.= '}';
 
         $this->_c_base = $this->_c_host;
@@ -165,9 +184,10 @@ class IMAP
      * List folders matching pattern
      *
      * @param string $pat If "*", then list all folders, if "%", then list folders at current level
+     *
+     * @return array
      */
-    function listPath($pat='*')
-    {
+    function listPath($pat='*') {
         $ret = array();
         $list = imap_getmailboxes($this->_c, $this->_c_host,$pat);
         foreach ($list as $x) {
@@ -177,36 +197,39 @@ class IMAP
                 'delimiter' => $x->delimiter,
             );
         }
+
         return $ret;
     }
 
     /**
-     * Get a Message
+     * Saves a part or the whole body of the specified message.
+     *
+     * @return boolean
      */
-    function mailGet($i)
-    {
-        return imap_savebody($this->_c,'mail',$i,null,FT_PEEK);
+    function mailGet($i) {
+        return imap_savebody($this->_c, 'mail', $i, null, FT_PEEK);
     }
 
     /**
      * Store a Message with proper date
+     *
+     * @return boolean
      */
-    function mailPut($mail,$opts,$date)
-    {
+    function mailPut($mail, $opts, $date) {
         $stat = $this->pathStat();
         $ret = imap_append($this->_c,$stat['check_path'],$mail,$opts,$date);
         if ($buf = imap_errors()) {
             die(print_r($buf,true));
         }
         return $ret;
-
     }
 
     /**
      * Message Info
+     *
+     * @return array
      */
-    function mailStat($i)
-    {
+    function mailStat($i) {
         $head = imap_headerinfo($this->_c,$i);
         return (array)$head;
     }
@@ -214,16 +237,18 @@ class IMAP
     /**
      * Immediately Delete and Expunge the message
      */
-    function mailWipe($i)
-    {
-        if ( ($_ENV['wipe']) && (imap_delete($this->_c,$i)) ) return imap_expunge($this->_c);
+    function mailWipe($i) {
+        if ( ($_ENV['wipe']) && (imap_delete($this->_c,$i)) ) {
+            return imap_expunge($this->_c);
+        }
     }
 
     /**
      * Sets the Current Mailfolder, Creates if Needed
+     *
+     * @return boolean
      */
-    function setPath($p,$make=false)
-    {
+    function setPath($p,$make=false) {
         if (substr($p,0,1)!='{') {
             $p = $this->_c_host . trim($p,'/');
         }
@@ -251,9 +276,10 @@ class IMAP
 
     /**
      * Returns Information about the current Path
+     *
+     * @return array
      */
-    function pathStat()
-    {
+    function pathStat() {
         $res = imap_mailboxmsginfo($this->_c);
         $ret = array(
             'date' => $res->Date,
@@ -273,8 +299,7 @@ class IMAP
 /**
  * Process CLI Arguments
  */
-function _args($argc,$argv)
-{
+function _args($argc,$argv) {
 
     $_ENV['src'] = null;
     $_ENV['tgt'] = null;
@@ -340,11 +365,14 @@ function _path_map($x)
 {
     if (preg_match('/}(.+)$/',$x,$m)) {
         switch (strtolower($m[1])) {
-        // case 'inbox':         return null;
-        case 'deleted items': return '[Gmail]/Trash';
-        case 'drafts':        return '[Gmail]/Drafts';
-        case 'junk e-mail':   return '[Gmail]/Spam';
-        case 'sent items':    return '[Gmail]/Sent Mail';
+            case 'deleted items':
+                return '[Gmail]/Trash';
+            case 'drafts':
+                return '[Gmail]/Drafts';
+            case 'junk e-mail':
+                return '[Gmail]/Spam';
+            case 'sent items':
+                return '[Gmail]/Sent Mail';
         }
         $x = str_replace('INBOX/',null,$m[1]);
     }
@@ -354,11 +382,11 @@ function _path_map($x)
 /**
  * @return true if we should skip this path
  */
-function _path_skip($path)
-{
+function _path_skip($path) {
     if ( ($path['attribute'] & LATT_NOSELECT) == LATT_NOSELECT) {
         return true;
     }
+
     // All Mail, Trash, Starred have this attribute
     if ( ($path['attribute'] & 96) == 96) {
         return true;
