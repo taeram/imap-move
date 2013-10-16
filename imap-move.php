@@ -35,6 +35,13 @@
 
 error_reporting(E_ALL | E_STRICT);
 
+// Test that php-imap is installed
+if (!function_exists('imap_open')) {
+    echo "Please install the php imap package.\n";
+    echo "e.g. For Ubuntu: sudo apt-get install php5-imap\n";
+    exit(1);
+}
+
 _args($argc,$argv);
 
 echo "Connecting Source...\n";
