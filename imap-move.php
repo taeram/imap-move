@@ -93,7 +93,9 @@ foreach ($src_path_list as $path) {
         $stat = $S->mailStat($src_idx);
         $stat['answered'] = trim($stat['Answered']);
         $stat['unseen'] = trim($stat['Unseen']);
-        if (empty($stat['subject'])) $stat['subject'] = "[ No Subject ] Message $src_idx";
+        if (empty($stat['subject'])) {
+            $stat['subject'] = "[ No Subject ] Message $src_idx";
+        }
 
         if (array_key_exists($stat['message_id'],$tgt_mail_list)) {
             echo "S:$src_idx Mail: {$stat['subject']} Copied Already\n";
@@ -109,22 +111,28 @@ foreach ($src_path_list as $path) {
 
         $S->mailGet($src_idx);
         $opts = array();
-        if (empty($stat['unseen'])) $opts[] = '\Seen';
+        if (empty($stat['unseen'])) {
+            $opts[] = '\Seen';
+        }
+
         if (!empty($stat['answered'])) {
             $opts[] = '\Answered';
         }
-        $opts = implode(' ',$opts);
-        $date = strftime('%d-%b-%Y %H:%M:%S +0000',strtotime($stat['MailDate']));
 
-        if ($res = $T->mailPut(file_get_contents('mail'),$opts,$date)) {
+        $opts = implode(' ',$opts);
+        $date = strftime('%d-%b-%Y %H:%M:%S +0000', strtotime($stat['MailDate']));
+
+        $res = $T->mailPut(file_get_contents('mail'), $opts, $date);
+        if ($res) {
             $S->mailWipe($src_idx);
             echo "{$tgt_path_stat['path']}\n";
         } else {
             die("Fail to Put $res\n");
         }
 
-        if ($_ENV['once']) die("--one and done\n");
-
+        if ($_ENV['once']) {
+            die("--one and done\n");
+        }
     }
 }
 
@@ -221,12 +229,16 @@ class IMAP {
      * Store a Message with proper date
      *
      * @return boolean
+     *
+     * @throws \Exception If IMAP errors are found
      */
     function mailPut($mail, $opts, $date) {
         $stat = $this->pathStat();
-        $ret = imap_append($this->_c,$stat['check_path'],$mail,$opts,$date);
-        if ($buf = imap_errors()) {
-            die(print_r($buf,true));
+        $ret = imap_append($this->_c, $stat['check_path'], $mail, $opts, $date);
+        $buf = imap_errors();
+        if ($buf) {
+            $message = implode("\n", $buf);
+            throw new \Exception($message);
         }
         return $ret;
     }
